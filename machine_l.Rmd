@@ -1,0 +1,114 @@
+---
+title: "Prediction Assignment"
+author: "Ekaterina Voronina"
+date: "17 09 2020"
+output: pdf_document
+---
+
+In this assignment we have 19622 observations from weight lifting exercises. Our outcome is a factor variable called 'classe'. In this dataset 6 young healthy participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in 5 different ways which are marked as A, B, C, D and E. So we should keep in mind if the condition of experiment will change it can change the outcome
+
+I used and compared two models to see which one has bigger accuracy percentage: decision tree model  and random forest model. 70% of the total training observations were used to build the models and the rest of 30% of the observations were used for model validation. Aslo the plots built in the analysis showing top 20 variables impact on the outcome and the accuracy in predicted and observed sets.
+
+# Downloading data and preparing libraries 
+```{r}
+library(randomForest) 
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(tidyverse)
+```
+
+```{r}
+url_train <- 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv'
+download.file(url_train,'pml-training.csv')
+
+url_test <- 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv'
+download.file(url_test,'pml-testing.csv')
+
+train_data <- read.csv("pml-training.csv", na.strings = c("NA", "#DIV/0!", ""))
+test_data  <- read.csv("pml-testing.csv", na.strings = c("NA", "#DIV/0!", ""))
+
+dim(train_data)
+sum(is.na(train_data))
+
+dim(test_data)
+sum(is.na(test_data))
+```
+
+# Cleaning the data by removing NA columns and columns which are not useful for the assignment
+
+```{r}
+no_na <- complete.cases(t(train_data)) & complete.cases(t(test_data))
+train_data <- train_data[,no_na]
+test_data  <- test_data[,no_na]
+sum(is.na(train_data))
+sum(is.na(test_data))
+
+train_data <- train_data[,-c(1:7)]
+test_data  <- test_data[,-c(1:7)]
+```
+# Making the analysis reproducible
+```{r}
+set.seed(123)
+```
+# Making data slicing by spliting the training data into training(train) set and validation(test) set.
+```{r}
+samples <- createDataPartition(y=train_data$classe, p=0.7, list=FALSE)
+sub_train <- train_data[samples, ] 
+sub_test <- train_data[-samples, ]
+dim(sub_train)
+dim(sub_test)
+```
+# Building a first model usuing a decision tree
+```{r}
+sub_test$classe <- as.factor(sub_test$classe)
+model1 <- rpart(classe ~ ., data = sub_train, method="class")
+prediction1 <- predict(model1, sub_test, type = "class")
+accuracy <- postResample(prediction1, sub_test$classe)
+```
+# Ploting the Decision Tree
+```{r}
+
+rpart.plot(model1, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+```
+
+
+# Testing the results using confusion matrix function:
+```{r}
+confusionMatrix(sub_test$classe, prediction1)
+```
+## the accuracy of using the following method is 73.76 %  
+
+# Usuing random forest method 
+```{r}
+sub_train$classe <- as.factor(sub_train$classe)
+model2 <- randomForest(classe ~. , data = sub_train, method="class")
+prediction2 <- predict(model2, sub_test, type = "class")
+```
+# Testing the results using confusion matrix function:
+```{r}
+confusionMatrix(prediction2, sub_test$classe)
+```
+## the accuracy of using the following method is 99.55 % 
+
+Based on the result the random forest method can be considered as a better method to use
+
+# Bulding plot based on the results 
+```{r, echo=TRUE}
+
+varImpPlot(model2, n.var = 20, main = 'Top 20 variables impact on outcome')
+
+res_plot <- qplot(classe, prediction2, data=sub_test,  colour= classe, 
+      main = "predicted vs. observed in validated test data", xlab = "Observed", ylab = "Predicted") +
+  geom_boxplot()+ geom_jitter()
+
+res_plot
+```  
+
+
+# Predicting final outcome levels on the original test data set using random forest algorithm
+```{r}
+
+result <- predict(model2, test_data, type="class")
+result
+```
